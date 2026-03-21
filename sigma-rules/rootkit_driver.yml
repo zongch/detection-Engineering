@@ -1,0 +1,51 @@
+title: Unsigned or Suspicious Driver Loaded
+id: n4o5p6q7-r8s9-3456-bcde-456789012789
+status: stable
+level: critical
+description: |
+  Detects loading of unsigned drivers or drivers from suspicious locations.
+  Rootkits and kernel-mode malware often use unsigned drivers to gain
+  kernel-level persistence and evade detection.
+references:
+  - https://attack.mitre.org/techniques/T1014/
+  - https://docs.microsoft.com/en-us/windows-hardware/drivers/install/driver-signing
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.privilege_escalation
+  - attack.persistence
+  - attack.t1014
+logsource:
+  category: driver_load
+  product: windows
+detection:
+  selection_unsigned:
+    Signed: 'false'
+  selection_suspicious_location:
+    ImageLoaded|contains:
+      - '\Temp\'
+      - '\AppData\'
+      - '\Downloads\'
+      - '\Desktop\'
+  condition: 1 of selection_*
+falsepositives:
+  - Driver development/testing environments
+  - Some specialized hardware drivers (rare)
+  - Beta/test drivers
+fields:
+  - ImageLoaded
+  - Image
+  - Signature
+  - Signed
+  - User
+  - Computer
+allowlist:
+  - ImageLoaded: 'C:\Windows\System32\drivers\test.sys'
+    Reason: 'Driver development - document specific test drivers'
+  - Image: 'C:\Windows\System32\svchost.exe'
+    ImageLoaded: 'C:\Windows\System32\drivers\*.sys'
+    Reason: 'Standard system driver loading'
+related:
+  - id: o5p6q7r8-s9t0-4567-cdef-567890123890
+    type: correlated

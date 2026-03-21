@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Sigma
+.sigma
+.sigma-cli/
+
+# Compiled SIEM Rules (auto-generated)
+# Uncomment if you want to track compiled rules in Git
+# compiled/splunk/*.conf
+# compiled/sentinel/*.kql
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test data
+tests/logs/*
+!tests/logs/.gitkeep
+
+# Secrets and credentials
+.env
+*.key
+*.pem
+secrets/
+credentials.json
+
+# OS specific
+Thumbs.db
+desktop.ini
+
+# Backup files
+*.bak
+*.backup

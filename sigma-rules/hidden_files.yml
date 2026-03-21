@@ -1,0 +1,48 @@
+title: Hidden Files Creation via attrib Command
+id: l2m3n4o5-p6q7-1234-efab-234567890567
+status: stable
+level: medium
+description: |
+  Detects creation of hidden files using Windows attrib command. Attackers
+  use hidden files to hide malicious tools, payloads, and backdoors from
+  casual inspection and automated scanning.
+references:
+  - https://attack.mitre.org/techniques/T1564/001/
+  - https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/attrib
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.defense_evasion
+  - attack.t1564.001
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection_attrib:
+    Image|endswith:
+      - '\attrib.exe'
+  selection_hidden_flag:
+    CommandLine|contains:
+      - '+h'
+      - '+h +s'
+  condition: all of selection_*
+falsepositives:
+  - Some legitimate software uses hidden files for configuration
+  - System file protection (rare in user directories)
+fields:
+  - Image
+  - CommandLine
+  - User
+  - Computer
+  - ProcessId
+  - ParentImage
+allowlist:
+  - ParentImage: 'C:\Windows\System32\cmd.exe'
+    CommandLine: '*C:\Windows\System32\attrib.exe*'
+    Reason: 'System configuration - review target file path'
+  - CommandLine: '*C:\Windows\*'
+    Reason: 'Windows system files - investigate if unusual location'
+related:
+  - id: m3n4o5p6-q7r8-2345-fabc-345678901678
+    type: derived

@@ -1,0 +1,65 @@
+title: Registry Persistence via Run Keys
+id: f5g6h7i8-j9k0-3456-bcde-567890123ef0
+status: stable
+level: medium
+description: |
+  Detects modifications to registry Run and RunOnce keys, a common
+  persistence mechanism. Attackers use these keys to execute malware
+  automatically when users log on.
+references:
+  - https://attack.mitre.org/techniques/T1547/001/
+  - https://docs.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.persistence
+  - attack.t1547.001
+logsource:
+  category: registry_set
+  product: windows
+detection:
+  selection_run_keys:
+    TargetObject|contains:
+      - '\SOFTWARE\Microsoft\Windows\CurrentVersion\Run'
+      - '\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce'
+      - '\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon'
+  selection_suspicious_location:
+    # Target executable not from standard locations
+    not (Details|startswith:
+      - 'C:\Program Files\'
+      - 'C:\Program Files (x86)\'
+      - 'C:\Windows\System32\'
+      - 'C:\Windows\SysWOW64\')
+  selection_executable:
+    Details|endswith:
+      - '.exe'
+      - '.bat'
+      - '.cmd'
+      - '.ps1'
+      - '.vbs'
+      - '.js'
+  condition: all of selection_*
+falsepositives:
+  - Software installation or updates
+  - Legitimate system administration tools
+  - User-configured startup applications (document in allowlist)
+fields:
+  - TargetObject
+  - Details
+  - User
+  - Computer
+  - ProcessId
+  - Image
+allowlist:
+  - TargetObject: '*\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\\OneDriveSetup.exe'
+    Reason: 'OneDrive auto-start - legitimate Microsoft component'
+  - TargetObject: '*\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\\MicrosoftEdgeAutoLaunch*'
+    Reason: 'Microsoft Edge auto-start - legitimate'
+  - TargetObject: '*\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\\Razer Synapse*'
+    Reason: 'Razer Synapse - legitimate hardware software'
+  - Details: 'C:\Users\*\AppData\Local\Microsoft\OneDrive\OneDrive.exe'
+    Reason: 'OneDrive user auto-start - legitimate'
+related:
+  - id: g6h7i8j9-k0l1-4567-cdef-678901234f01
+    type: similar

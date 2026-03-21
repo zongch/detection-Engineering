@@ -1,0 +1,14 @@
+# Sigma CLI Configuration File
+# See https://github.com/SigmaHQ/sigma-cli for documentation
+
+backend-options:
+  splunk:
+    sysmon: true
+    index: "windows"
+    sourcetype: "WinEventLog:Sysmon"
+  microsoft365defender:
+    table: "DeviceProcessEvents"
+
+validation:
+  check-unused-modifiers: true
+  backend: splunk

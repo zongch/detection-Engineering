@@ -1,0 +1,45 @@
+title: Domain Account Discovery via net Commands
+id: a7b8c9d0-e1f2-6789-efab-789012345012
+status: stable
+level: medium
+description: |
+  Detects domain account enumeration using net commands. Attackers enumerate
+  accounts to identify privileged users and lateral movement targets.
+references:
+  - https://attack.mitre.org/techniques/T1087/002/
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.discovery
+  - attack.t1087.002
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection_net:
+    Image|endswith: '\net.exe'
+  selection_user:
+    CommandLine|contains:
+      - 'user'
+      - 'user /domain'
+  selection_group:
+    CommandLine|contains:
+      - 'group'
+      - 'group /domain'
+  condition: selection_net and (selection_user or selection_group)
+falsepositives:
+  - IT administration and account management
+  - Helpdesk operations
+fields:
+  - Image
+  - CommandLine
+  - User
+  - Computer
+  - ProcessId
+allowlist:
+  - User: 'DOMAIN\ITAdmin'
+    Reason: 'Account management - verify authorized access'
+related:
+  - id: b8c9d0e1-f2g3-7890-fabc-890123456123
+    type: similar

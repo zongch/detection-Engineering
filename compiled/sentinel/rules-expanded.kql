@@ -1,0 +1,205 @@
+// Microsoft Sentinel Detection Rules - Expanded Set (12 New Rules)
+// Compiled from Sigma YAML format
+// Target Platform: Microsoft Sentinel (M365 Defender / Sysmon)
+// Generated: 2026-03-22
+
+// ============================================================================
+// DEFENSE EVASION RULES (3 rules)
+// ============================================================================
+
+// Rule 1: Windows Defender Security Tool Disabled (T1562.001)
+DeviceRegistryEvents
+| where ActionType == "RegistryValueSet"
+| where RegistryKey has "SOFTWARE\\Policies\\Microsoft\\Windows Defender"
+  or RegistryKey has "SOFTWARE\\Microsoft\\Windows Defender"
+| where RegistryValueData has "DisableAntiSpyware"
+  or RegistryValueData has "DisableRealtimeMonitoring"
+  or RegistryValueData has "DisableBehaviorMonitoring"
+  or RegistryValueData has "DisableBlockAtFirstSeen"
+  or RegistryValueData has "DisableIOAVProtection"
+  or RegistryValueData has "DisablePrivacyMode"
+  or RegistryValueData has "DisableRoutinelyTakingAction"
+  or RegistryValueData has "DisableScanningNetworkFiles"
+  or RegistryValueData has "DisableScriptScanning"
+  or RegistryValueData has "ServiceKeepAlive"
+| where RegistryValueData has "1"
+| where not InitiatingProcessFileName =~ "msiexec.exe"
+| extend RiskScore = 90, Tactic = "DefenseEvasion", Technique = "T1562.001"
+| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName,
+    RegistryKey, RegistryValueName, RegistryValueData, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// Rule 2: Windows Event Logging Disabled (T1562.004)
+DeviceRegistryEvents
+| where ActionType == "RegistryValueSet"
+| where RegistryKey has "SYSTEM\\CurrentControlSet\\Services\\EventLog"
+| where RegistryValueName in ("Start", "File")
+| where RegistryValueData in ("4", "0")
+| extend RiskScore = 95, Tactic = "DefenseEvasion", Technique = "T1562.004"
+| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName,
+    RegistryKey, RegistryValueName, RegistryValueData, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// Rule 3: Hidden Files Creation via attrib Command (T1564.001)
+DeviceProcessEvents
+| where FileName =~ "attrib.exe"
+| where ProcessCommandLine has "+h" or ProcessCommandLine has "+h +s"
+| where not(InitiatingProcessFileName =~ "cmd.exe"
+    and ProcessCommandLine contains "C:\\Windows\\System32\\attrib.exe")
+| where not ProcessCommandLine contains "C:\\Windows\\"
+| extend RiskScore = 50, Tactic = "DefenseEvasion", Technique = "T1564.001"
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine,
+    InitiatingProcessFileName, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// ============================================================================
+// CREDENTIAL ACCESS RULES (4 rules)
+// ============================================================================
+
+// Rule 4: SAM Database Dumping via Reg.exe (T1003.002)
+DeviceProcessEvents
+| where FileName =~ "reg.exe"
+| where ProcessCommandLine has "save"
+| where ProcessCommandLine has "hklm\\sam"
+  or ProcessCommandLine has "hklm\\\\sam"
+  or ProcessCommandLine has "HKLM\\SAM"
+  or ProcessCommandLine has "HKLM\\\\SAM"
+| where not(InitiatingProcessFileName =~ "wmiprvse.exe" and AccountName == "SYSTEM")
+| where not(InitiatingProcessFileName =~ "cmd.exe" and AccountName == "SYSTEM")
+| extend RiskScore = 95, Tactic = "CredentialAccess", Technique = "T1003.002"
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine,
+    InitiatingProcessFileName, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// Rule 5: NTDS.dit Active Directory Database Extraction (T1003.003)
+DeviceProcessEvents
+| where (FileName in ("cmd.exe", "powershell.exe")
+    and (ProcessCommandLine contains "\\Windows\\NTDS\\ntds.dit"
+        or ProcessCommandLine contains "ntds.dit"))
+  or (FileName =~ "ntdsutil.exe"
+    and (ProcessCommandLine has "ifm" or ProcessCommandLine has "create"))
+  or (FileName =~ "vssadmin.exe"
+    and (ProcessCommandLine has "create" or ProcessCommandLine has "shadowcopy"))
+| where not(InitiatingProcessFileName =~ "wmiprvse.exe"
+    and AccountName contains "BackupAccount")
+| where not(FileName =~ "vssadmin.exe"
+    and ProcessCommandLine contains "create shadowcopy"
+    and AccountName == "SYSTEM")
+| extend RiskScore = 95, Tactic = "CredentialAccess", Technique = "T1003.003"
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine,
+    InitiatingProcessFileName, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// Rule 6: Private Key File Access and Copy (T1552.004)
+DeviceFileEvents
+| where ActionType in ("FileAccessed", "FileCopied")
+| where FileName has_any (".pem", ".key", ".p12", ".pfx", ".jks", ".keystore")
+| where InitiatingProcessFileName in ("cmd.exe", "powershell.exe", "wscript.exe", "cscript.exe")
+| where not(InitiatingProcessFileName =~ "certutil.exe"
+    and FolderPath contains "ProgramData")
+| where not InitiatingProcessFileName =~ "msiexec.exe"
+| extend RiskScore = 80, Tactic = "CredentialAccess", Technique = "T1552.004"
+| project Timestamp, DeviceName, AccountName, FileName, FolderPath,
+    InitiatingProcessFileName, ActionType, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// Rule 7: Cached Domain Credentials Dumping (T1003.005)
+DeviceProcessEvents
+| where (FileName =~ "reg.exe" and ProcessCommandLine has "save"
+    and (ProcessCommandLine has "hklm\\security\\cache"
+        or ProcessCommandLine has "hklm\\\\security\\\\cache"
+        or ProcessCommandLine has "HKLM\\SECURITY\\Cache"
+        or ProcessCommandLine has "HKLM\\\\SECURITY\\Cache"
+        or ProcessCommandLine has "NL$KM"))
+  or (FileName =~ "mimikatz.exe"
+    and (ProcessCommandLine has "lsadump::cache" or ProcessCommandLine has "sekurlsa::cred"))
+| where not(InitiatingProcessFileName =~ "wmiprvse.exe" and AccountName == "SYSTEM")
+| where not(FolderPath contains "Program Files" and FileName =~ "mimikatz.exe")
+| extend RiskScore = 90, Tactic = "CredentialAccess", Technique = "T1003.005"
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine,
+    InitiatingProcessFileName, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// ============================================================================
+// DISCOVERY RULES (2 rules)
+// ============================================================================
+
+// Rule 8: Remote System Discovery via Network Commands (T1018)
+DeviceProcessEvents
+| where FileName in ("ping.exe", "nslookup.exe", "tracert.exe")
+| summarize DiscoveryCount = count() by DeviceName, AccountName, FileName, bin(Timestamp, 5m)
+| where DiscoveryCount > 20
+| extend RiskScore = 40, Tactic = "Discovery", Technique = "T1018"
+| project Timestamp, DeviceName, AccountName, FileName, DiscoveryCount, RiskScore, Tactic, Technique
+| order by DiscoveryCount desc
+
+// Rule 9: Domain Account Discovery via net Commands (T1087.002)
+DeviceProcessEvents
+| where FileName =~ "net.exe"
+| where ProcessCommandLine has "user"
+  or ProcessCommandLine has "user /domain"
+  or ProcessCommandLine has "group"
+  or ProcessCommandLine has "group /domain"
+| summarize DiscoveryCount = count() by DeviceName, AccountName, ProcessCommandLine, bin(Timestamp, 5m)
+| where DiscoveryCount > 10
+| where not AccountName contains "ITAdmin"
+| extend RiskScore = 45, Tactic = "Discovery", Technique = "T1087.002"
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine, DiscoveryCount,
+    RiskScore, Tactic, Technique
+| order by DiscoveryCount desc
+
+// ============================================================================
+// LATERAL MOVEMENT RULES (1 rule)
+// ============================================================================
+
+// Rule 10: SMB/Windows Admin Shares Lateral Movement (T1021.002)
+DeviceNetworkEvents
+| where ActionType == "ConnectionAccepted"
+| where RemotePort == 445
+| where RemoteUrl has "ADMIN$" or RemoteUrl has "C$" or RemoteUrl has "IPC$"
+| where not InitiatingProcessFileName =~ "svchost.exe"
+| where not AccountName contains "Administrator"
+| extend RiskScore = 75, Tactic = "LateralMovement", Technique = "T1021.002"
+| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName,
+    RemoteIP, RemotePort, RemoteUrl, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// ============================================================================
+// ADVANCED TECHNIQUES RULES (2 rules)
+// ============================================================================
+
+// Rule 11: Unsigned or Suspicious Driver Loaded (T1014)
+DeviceImageLoadEvents
+| where IsSigned == false
+  or (FolderPath contains "\\Temp\\"
+      or FolderPath contains "\\AppData\\"
+      or FolderPath contains "\\Downloads\\"
+      or FolderPath contains "\\Desktop\\")
+| where not(FolderPath == "C:\\Windows\\System32\\drivers\\test.sys")
+| where not(InitiatingProcessFileName =~ "svchost.exe"
+    and FolderPath contains "C:\\Windows\\System32\\drivers\\")
+| extend RiskScore = 95, Tactic = "PrivilegeEscalation", Technique = "T1014"
+| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName,
+    FileName, FolderPath, IsSigned, Signer, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// Rule 12: DLL Side-Loading via Known Vulnerable Applications (T1574.002)
+DeviceImageLoadEvents
+| where FileName has_any (".dll", ".exe")
+| where FolderPath contains "\\Temp\\"
+  or FolderPath contains "\\AppData\\Local\\Temp\\"
+  or FolderPath contains "\\Downloads\\"
+  or FolderPath contains "\\Desktop\\"
+| where InitiatingProcessFileName in ("svchost.exe", "explorer.exe", "notepad.exe",
+    "winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe")
+| where not(InitiatingProcessFileName =~ "svchost.exe"
+    and FolderPath contains "C:\\Windows\\System32\\")
+| where not FolderPath contains "C:\\Windows\\Temp\\"
+| extend RiskScore = 70, Tactic = "DefenseEvasion", Technique = "T1574.002"
+| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName,
+    FileName, FolderPath, RiskScore, Tactic, Technique
+| order by Timestamp desc
+
+// ============================================================================
+// END OF EXPANDED RULES
+// ============================================================================

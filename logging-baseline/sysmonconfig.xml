@@ -1,0 +1,348 @@
+﻿<Sysmon schemaversion="4.90">
+  <!--
+    ========================================================
+    鐢熶骇绾?Sysmon 閰嶇疆鏂囦欢
+    鐗堟湰: 1.0  |  鏃ユ湡: 2026-03-21
+    浣滆€? 妫€娴嬪伐绋嬪洟闃?
+    鍩轰簬: SwiftOnSecurity/sysmon-config + 濞佽儊妫€娴嬪寮?
+    
+    瑕嗙洊 MITRE ATT&CK 鎶€鏈?
+      T1059 - 鍛戒护涓庤剼鏈В閲婂櫒锛堟墽琛岋級
+      T1003 - 鍑瘉杞偍锛堝嚟璇佽闂級
+      T1055 - 杩涚▼娉ㄥ叆锛堥槻寰¤閬?鏉冮檺鎻愬崌锛?
+      T1547 - 鍚姩/鐧诲綍鑷姩鍚姩锛堟寔涔呭寲锛?
+      T1071 - 搴旂敤灞傚崗璁瓹2锛堟寚鎸ユ帶鍒讹級
+      T1021 - 杩滅▼鏈嶅姟锛堟í鍚戠Щ鍔級
+      T1070 - 娓呴櫎鐥曡抗锛堥槻寰¤閬匡級
+    ========================================================
+  -->
+
+  <!-- 瀵硅繘绋嬪垱寤轰簨浠惰繘琛屽搱甯岃绠楋紙鐢ㄤ簬鎭舵剰杞欢妫€娴嬶級 -->
+  <HashAlgorithms>md5,sha256,IMPHASH</HashAlgorithms>
+  
+  <!-- 妫€鏌ヤ唬鐮佺鍚?-->
+  <CheckRevocation>False</CheckRevocation>
+
+  <EventFiltering>
+
+    <!-- ============================================================
+         浜嬩欢 ID 1: 杩涚▼鍒涘缓
+         鎹曡幏鎵€鏈夎繘绋嬪垱寤猴紝鎺掗櫎楂橀浣庨闄╁櫔闊?
+         ATT&CK: T1059, T1053, T1203, T1204
+         ============================================================ -->
+    <RuleGroup name="ProcessCreate" groupRelation="or">
+      <ProcessCreate onmatch="exclude">
+        <!-- 鎺掗櫎楂橀绯荤粺杩涚▼锛堝凡楠岃瘉鍚堣锛?-->
+        <Image condition="is">C:\Windows\System32\conhost.exe</Image>
+        <Image condition="is">C:\Windows\System32\wermgr.exe</Image>
+        <Image condition="end with">tiworker.exe</Image>
+        <Image condition="end with">SearchIndexer.exe</Image>
+        <Image condition="end with">MpCmdRun.exe</Image>
+        <!-- 鎺掗櫎宸茬煡鍚堣鐨勭埗瀛愯繘绋嬮摼 -->
+        <ParentImage condition="is">C:\Windows\System32\services.exe</ParentImage>
+      </ProcessCreate>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 2: 鏂囦欢鍒涘缓鏃堕棿琚慨鏀癸紙鏃堕棿鎴崇鏀癸級
+         ATT&CK: T1070.006 - 鏃堕棿鎴充吉閫?
+         ============================================================ -->
+    <RuleGroup name="FileCreateTime" groupRelation="or">
+      <FileCreateTime onmatch="include">
+        <!-- 鎹曡幏绯荤粺鐩綍涓殑鏃堕棿鎴充慨鏀?-->
+        <TargetFilename condition="contains">C:\Windows\System32</TargetFilename>
+        <TargetFilename condition="contains">C:\Windows\SysWOW64</TargetFilename>
+        <!-- 鎹曡幏鍙墽琛屾枃浠舵椂闂存埑淇敼 -->
+        <TargetFilename condition="end with">.exe</TargetFilename>
+        <TargetFilename condition="end with">.dll</TargetFilename>
+        <TargetFilename condition="end with">.bat</TargetFilename>
+        <TargetFilename condition="end with">.ps1</TargetFilename>
+      </FileCreateTime>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 3: 缃戠粶杩炴帴
+         鎹曡幏鍙枒杩涚▼鐨勫嚭绔欑綉缁滆繛鎺?
+         ATT&CK: T1071, T1043, T1219
+         ============================================================ -->
+    <RuleGroup name="NetworkConnect" groupRelation="or">
+      <NetworkConnect onmatch="exclude">
+        <!-- 鑴氭湰寮曟搸鐨勭綉缁滆繛鎺ワ紙楂樺害鍙枒锛?-->
+        <Image condition="end with">powershell.exe</Image>
+        <Image condition="end with">pwsh.exe</Image>
+        <Image condition="end with">wscript.exe</Image>
+        <Image condition="end with">cscript.exe</Image>
+        <Image condition="end with">mshta.exe</Image>
+        <Image condition="end with">regsvr32.exe</Image>
+        <Image condition="end with">rundll32.exe</Image>
+        <Image condition="end with">msiexec.exe</Image>
+        <!-- 闈炴爣鍑嗙鍙ｇ殑 CMD 缃戠粶杩炴帴 -->
+        <Image condition="end with">cmd.exe</Image>
+        <!-- 绯荤粺绠＄悊宸ュ叿鍑虹珯杩炴帴 -->
+        <Image condition="end with">net.exe</Image>
+        <Image condition="end with">net1.exe</Image>
+        <Image condition="end with">whoami.exe</Image>
+      </NetworkConnect>
+      <NetworkConnect onmatch="exclude">
+        <!-- 鎺掗櫎鏈湴鍥炵幆 -->
+        <DestinationIp condition="is">127.0.0.1</DestinationIp>
+        <DestinationIp condition="is">0.0.0.0</DestinationIp>
+        <!-- 鎺掗櫎宸茬煡鍚堣鐨勬洿鏂版湇鍔?-->
+        <Image condition="is">C:\Windows\System32\svchost.exe</Image>
+      </NetworkConnect>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 5: 杩涚▼缁堟
+         杩借釜瀹夊叏宸ュ叿琚粓姝紙T1562.001锛?
+         ============================================================ -->
+    <RuleGroup name="ProcessTerminate" groupRelation="or">
+      <ProcessTerminate onmatch="include">
+        <Image condition="end with">MsMpEng.exe</Image>
+        <Image condition="end with">SenseIR.exe</Image>
+        <Image condition="end with">CSFalconService.exe</Image>
+        <Image condition="end with">cb.exe</Image>
+        <Image condition="contains">antivirus</Image>
+        <Image condition="contains">security</Image>
+      </ProcessTerminate>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 6: 椹卞姩鍔犺浇
+         ATT&CK: T1014 - Rootkit锛孴1068 - 鍐呮牳婕忔礊鍒╃敤
+         ============================================================ -->
+    <RuleGroup name="DriverLoad" groupRelation="or">
+      <DriverLoad onmatch="include">
+        <!-- 鏈鍚嶉┍鍔紙涓ラ噸椋庨櫓锛?-->
+        <Signed condition="is">false</Signed>
+        <!-- 浠庨潪鏍囧噯浣嶇疆鍔犺浇鐨勯┍鍔?-->
+        <ImageLoaded condition="contains">\Temp\</ImageLoaded>
+        <ImageLoaded condition="contains">\AppData\</ImageLoaded>
+        <ImageLoaded condition="contains">\Downloads\</ImageLoaded>
+      </DriverLoad>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 7: 闀滃儚鍔犺浇锛圖LL 鍔犺浇锛?
+         鎹曡幏鍏抽敭杩涚▼鍔犺浇鐨勫彲鐤?DLL
+         ATT&CK: T1574 - DLL鍔寔锛孴1055 - 杩涚▼娉ㄥ叆
+         ============================================================ -->
+    <RuleGroup name="ImageLoad" groupRelation="or">
+      <ImageLoad onmatch="include">
+        <!-- LSASS 鍔犺浇鐨勯潪绯荤粺 DLL锛堝嚟璇佽闂級 -->
+        <Image condition="end with">lsass.exe</Image>
+        <!-- 宸茬煡鎭舵剰 DLL 鍚嶇О -->
+        <ImageLoaded condition="end with">mimikatz.dll</ImageLoaded>
+        <!-- 浠庝复鏃剁洰褰曞姞杞界殑 DLL -->
+        <ImageLoaded condition="contains">\Temp\</ImageLoaded>
+        <ImageLoaded condition="contains">\AppData\Local\Temp\</ImageLoaded>
+        <!-- 鏈鍚嶇殑 DLL 鍔犺浇鍒伴珮鏉冮檺杩涚▼ -->
+      </ImageLoad>
+      <ImageLoad onmatch="exclude">
+        <!-- 鎺掗櫎宸茬煡鍚堣鐨勭郴缁?DLL -->
+        <ImageLoaded condition="begin with">C:\Windows\System32\</ImageLoaded>
+        <ImageLoaded condition="begin with">C:\Windows\SysWOW64\</ImageLoaded>
+        <ImageLoaded condition="begin with">C:\Windows\WinSxS\</ImageLoaded>
+      </ImageLoad>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 8: CreateRemoteThread锛堣繙绋嬬嚎绋嬫敞鍏ワ級
+         ATT&CK: T1055 - 杩涚▼娉ㄥ叆锛堥珮缃俊搴︽敾鍑昏涓猴級
+         ============================================================ -->
+    <RuleGroup name="CreateRemoteThread" groupRelation="or">
+      <CreateRemoteThread onmatch="include">
+        <!-- 鎵€鏈夎繙绋嬬嚎绋嬪垱寤洪兘闇€瑕佽褰?-->
+        <TargetImage condition="contains">.</TargetImage>
+      </CreateRemoteThread>
+      <CreateRemoteThread onmatch="exclude">
+        <!-- 鎺掗櫎宸茬煡鍚堣鐨勮皟璇曞櫒鍜屽畨鍏ㄨ蒋浠?-->
+        <SourceImage condition="is">C:\Windows\System32\csrss.exe</SourceImage>
+        <SourceImage condition="is">C:\Windows\System32\wininit.exe</SourceImage>
+        <TargetImage condition="is">C:\Windows\System32\csrss.exe</TargetImage>
+      </CreateRemoteThread>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 9: RawAccessRead锛堝師濮嬬鐩樿鍙栵級
+         ATT&CK: T1003.002 - SAM鏂囦欢鍑瘉杞偍
+         ============================================================ -->
+    <RuleGroup name="RawAccessRead" groupRelation="or">
+      <RawAccessRead onmatch="include">
+        <!-- 鎹曡幏鎵€鏈夊師濮嬬鐩樿鍙栵紙鏋佸皯鍚堣杩涚▼闇€瑕侊級 -->
+        <Image condition="contains">.</Image>
+      </RawAccessRead>
+      <RawAccessRead onmatch="exclude">
+        <Image condition="is">C:\Windows\System32\svchost.exe</Image>
+        <Image condition="is">System</Image>
+        <!-- 鎺掗櫎宸茬煡纾佺洏宸ュ叿 -->
+        <Image condition="end with">defrag.exe</Image>
+        <Image condition="end with">chkdsk.exe</Image>
+      </RawAccessRead>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 10: 杩涚▼璁块棶锛圥rocessAccess锛?
+         鏍稿績锛氭崟鑾?LSASS 鍐呭瓨杞偍琛屼负
+         ATT&CK: T1003.001 - LSASS 鍑瘉杞偍锛堟渶楂樹紭鍏堢骇锛?
+         ============================================================ -->
+    <RuleGroup name="ProcessAccess" groupRelation="or">
+      <ProcessAccess onmatch="include">
+        <!-- 浠讳綍杩涚▼璁块棶 LSASS锛堥珮缃俊搴﹀嚟璇佽浆鍌級 -->
+        <TargetImage condition="end with">lsass.exe</TargetImage>
+        <!-- 璁块棶鍏朵粬楂樹环鍊艰繘绋?-->
+        <TargetImage condition="end with">winlogon.exe</TargetImage>
+        <TargetImage condition="end with">csrss.exe</TargetImage>
+        <!-- 鍙枒楂樻潈闄愯闂帺鐮?-->
+        <GrantedAccess condition="is">0x1010</GrantedAccess>
+        <GrantedAccess condition="is">0x1038</GrantedAccess>
+        <GrantedAccess condition="is">0x1fffff</GrantedAccess>
+        <GrantedAccess condition="is">0x1410</GrantedAccess>
+      </ProcessAccess>
+      <ProcessAccess onmatch="exclude">
+        <!-- 鎺掗櫎宸茬煡瀹夊叏宸ュ叿瀵?LSASS 鐨勫悎瑙勮闂?-->
+        <SourceImage condition="is">C:\Windows\System32\wininit.exe</SourceImage>
+        <SourceImage condition="is">C:\Windows\System32\csrss.exe</SourceImage>
+        <SourceImage condition="is">C:\Windows\System32\lsm.exe</SourceImage>
+        <SourceImage condition="begin with">C:\ProgramData\Microsoft\Windows Defender</SourceImage>
+      </ProcessAccess>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 11: 鏂囦欢鍒涘缓
+         杩借釜鍙枒浣嶇疆鐨勬柊鏂囦欢鍒涘缓
+         ATT&CK: T1105 - 宸ュ叿浼犺緭锛孴1486 - 鍕掔储鍔犲瘑
+         ============================================================ -->
+    <RuleGroup name="FileCreate" groupRelation="or">
+      <FileCreate onmatch="include">
+        <!-- 鍚姩鐩綍涓殑鏂版枃浠讹紙鎸佷箙鍖栵級 -->
+        <TargetFilename condition="contains">\Start Menu\Programs\Startup\</TargetFilename>
+        <TargetFilename condition="contains">\AppData\Roaming\Microsoft\Windows\Start Menu\</TargetFilename>
+        <!-- 绯荤粺鐩綍涓殑鍙墽琛屾枃浠?-->
+        <TargetFilename condition="begin with">C:\Windows\System32\</TargetFilename>
+        <TargetFilename condition="begin with">C:\Windows\SysWOW64\</TargetFilename>
+        <!-- 鍕掔储杞欢鏂囦欢鎵╁睍鍚?-->
+        <TargetFilename condition="end with">.encrypted</TargetFilename>
+        <TargetFilename condition="end with">.locked</TargetFilename>
+        <TargetFilename condition="end with">.WNCRY</TargetFilename>
+        <TargetFilename condition="end with">.ransom</TargetFilename>
+        <TargetFilename condition="contains">DECRYPT</TargetFilename>
+        <TargetFilename condition="contains">README_HOW_TO</TargetFilename>
+        <!-- 鑴氭湰鏂囦欢鎶曟斁 -->
+        <TargetFilename condition="begin with">C:\Users\Public\</TargetFilename>
+        <TargetFilename condition="begin with">C:\Windows\Temp\</TargetFilename>
+      </FileCreate>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 12/13/14: 娉ㄥ唽琛ㄦ搷浣?
+         ATT&CK: T1547.001 - Run閿寔涔呭寲锛孴1112 - 娉ㄥ唽琛ㄤ慨鏀?
+         ============================================================ -->
+    <RuleGroup name="RegistryEvent" groupRelation="or">
+      <RegistryEvent onmatch="include">
+        <!-- 鎸佷箙鍖栫浉鍏虫敞鍐岃〃閿?-->
+        <TargetObject condition="contains">SOFTWARE\Microsoft\Windows\CurrentVersion\Run</TargetObject>
+        <TargetObject condition="contains">SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce</TargetObject>
+        <TargetObject condition="contains">SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon</TargetObject>
+        <TargetObject condition="contains">SYSTEM\CurrentControlSet\Services</TargetObject>
+        <!-- 瀹夊叏宸ュ叿绂佺敤 -->
+        <TargetObject condition="contains">SOFTWARE\Policies\Microsoft\Windows Defender</TargetObject>
+        <TargetObject condition="contains">DisableAntiSpyware</TargetObject>
+        <TargetObject condition="contains">DisableRealtimeMonitoring</TargetObject>
+        <!-- LSASS 淇濇姢妯″紡淇敼 -->
+        <TargetObject condition="contains">SYSTEM\CurrentControlSet\Control\Lsa</TargetObject>
+        <!-- AppInit DLL锛堟寔涔呭寲/娉ㄥ叆锛?-->
+        <TargetObject condition="contains">AppInit_DLLs</TargetObject>
+      </RegistryEvent>
+      <RegistryEvent onmatch="exclude">
+        <!-- 鎺掗櫎宸茬煡鍚堣鐨勭郴缁熸洿鏂?-->
+        <Image condition="is">C:\Windows\regedit.exe</Image>
+        <Image condition="is">C:\Windows\System32\msiexec.exe</Image>
+      </RegistryEvent>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 15: 鏂囦欢鍒涘缓娴佸搱甯岋紙ADS - 澶囩敤鏁版嵁娴侊級
+         ATT&CK: T1564.004 - NTFS澶囩敤鏁版嵁娴侀殣钘?
+         ============================================================ -->
+    <RuleGroup name="FileCreateStreamHash" groupRelation="or">
+      <FileCreateStreamHash onmatch="include">
+        <!-- 鎹曡幏鎵€鏈堿DS鍒涘缓 -->
+        <TargetFilename condition="contains">:$DATA</TargetFilename>
+        <TargetFilename condition="contains">Zone.Identifier</TargetFilename>
+      </FileCreateStreamHash>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 17/18: 鍛藉悕绠￠亾鍒涘缓/杩炴帴
+         ATT&CK: T1021.002 - SMB/PsExec锛孴1559 - 杩涚▼闂撮€氫俊
+         ============================================================ -->
+    <RuleGroup name="PipeEvent" groupRelation="or">
+      <PipeEvent onmatch="include">
+        <!-- 宸茬煡鎭舵剰绠￠亾鍚嶇О -->
+        <PipeName condition="contains">msagent_</PipeName>
+        <PipeName condition="contains">postex_</PipeName>
+        <PipeName condition="contains">mojo.5688</PipeName>
+        <PipeName condition="is">\PSEXESVC</PipeName>
+        <PipeName condition="begin with">\PAExec</PipeName>
+        <!-- 鍙枒鐨勯殢鏈虹閬撳悕绉版ā寮忥紙Cobalt Strike榛樿锛?-->
+        <PipeName condition="contains">status_</PipeName>
+      </PipeEvent>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 22: DNS 鏌ヨ
+         鎹曡幏鍙枒杩涚▼鐨?DNS 瑙ｆ瀽
+         ATT&CK: T1071.004 - DNS C2
+         ============================================================ -->
+    <RuleGroup name="DnsQuery" groupRelation="or">
+      <DnsQuery onmatch="include">
+        <!-- 鑴氭湰寮曟搸鐨?DNS 鏌ヨ锛堥珮搴﹀彲鐤戯級 -->
+        <Image condition="end with">powershell.exe</Image>
+        <Image condition="end with">pwsh.exe</Image>
+        <Image condition="end with">wscript.exe</Image>
+        <Image condition="end with">cscript.exe</Image>
+        <Image condition="end with">mshta.exe</Image>
+        <Image condition="end with">rundll32.exe</Image>
+        <Image condition="end with">regsvr32.exe</Image>
+        <Image condition="end with">certutil.exe</Image>
+        <Image condition="end with">bitsadmin.exe</Image>
+      </DnsQuery>
+      <DnsQuery onmatch="exclude">
+        <!-- 鎺掗櫎宸茬煡鍚堣鐨勬洿鏂版煡璇?-->
+        <QueryName condition="end with">microsoft.com</QueryName>
+        <QueryName condition="end with">windowsupdate.com</QueryName>
+        <QueryName condition="end with">windows.net</QueryName>
+      </DnsQuery>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 23: 鏂囦欢鍒犻櫎锛堝凡褰掓。锛?
+         ATT&CK: T1070.004 - 鍒犻櫎鏂囦欢娓呴櫎鐥曡抗
+         ============================================================ -->
+    <RuleGroup name="FileDelete" groupRelation="or">
+      <FileDelete onmatch="include">
+        <!-- 鏃ュ織鏂囦欢鍒犻櫎 -->
+        <TargetFilename condition="end with">.evtx</TargetFilename>
+        <TargetFilename condition="end with">.log</TargetFilename>
+        <!-- 绯荤粺鐩綍涓殑鏂囦欢鍒犻櫎 -->
+        <TargetFilename condition="begin with">C:\Windows\System32\winevt\</TargetFilename>
+        <!-- Volume Shadow Copy 鐩稿叧 -->
+        <TargetFilename condition="contains">shadow</TargetFilename>
+      </FileDelete>
+    </RuleGroup>
+
+    <!-- ============================================================
+         浜嬩欢 ID 25: 杩涚▼绡℃敼锛堣繘绋嬮晜绌?鍌€鍎¤繘绋嬶級
+         ATT&CK: T1055.012 - 杩涚▼闀傜┖
+         ============================================================ -->
+    <RuleGroup name="ProcessTampering" groupRelation="or">
+      <ProcessTampering onmatch="include">
+        <Type condition="contains">.</Type>
+      </ProcessTampering>
+    </RuleGroup>
+
+  </EventFiltering>
+</Sysmon>
+
+

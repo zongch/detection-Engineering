@@ -1,0 +1,53 @@
+title: Process Hollowing / Injection Detection
+id: d4e5f6g7-h8i9-1234-efab-345678901cde
+status: stable
+level: high
+description: |
+  Detects CreateRemoteThread API calls, a common technique for process
+  hollowing and injection. Attackers use this to inject malicious code into
+  legitimate processes to evade detection.
+references:
+  - https://attack.mitre.org/techniques/T1055/012/
+  - https://attack.mitre.org/techniques/T1055/
+  - https://www.elastic.co/guide/en/security/current/process-injection-via-createremotethread.html
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.privilege_escalation
+  - attack.defense_evasion
+  - attack.t1055.012
+  - attack.t1055
+logsource:
+  category: create_remote_thread
+  product: windows
+detection:
+  selection_injection:
+    NewThreadId: '*'
+  selection_suspicious:
+    # Exclude known benign sources
+    not (SourceImage|startswith: 'C:\Windows\System32\')
+  condition: selection_injection and selection_suspicious
+falsepositives:
+  - Debuggers (Visual Studio, WinDbg)
+  - Some legitimate inter-process communication applications
+  - Performance monitoring tools
+fields:
+  - SourceImage
+  - TargetImage
+  - NewThreadId
+  - User
+  - Computer
+  - StartAddress
+  - SourceProcessId
+  - TargetProcessId
+allowlist:
+  - SourceImage: 'C:\Windows\System32\csrss.exe'
+    Reason: 'Client/Server Runtime Subsystem - legitimate IPC'
+  - SourceImage: 'C:\Windows\System32\wininit.exe'
+    Reason: 'Windows initialization process - system component'
+  - TargetImage: 'C:\Windows\System32\csrss.exe'
+    Reason: 'Target is a system process - legitimate activity'
+related:
+  - id: e5f6g7h8-i9j0-2345-fabc-456789012def
+    type: derived

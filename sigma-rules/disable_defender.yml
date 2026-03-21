@@ -1,0 +1,58 @@
+title: Windows Defender Security Tool Disabled
+id: h8i9j0k1-l2m3-7890-fabc-890123456123
+status: stable
+level: high
+description: |
+  Detects attempts to disable or impair Windows Defender security features.
+  Attackers frequently disable antivirus and security tools to avoid
+  detection during malware execution.
+references:
+  - https://attack.mitre.org/techniques/T1562/001/
+  - https://docs.microsoft.com/en-us/windows/security/threat-protection/microsoft-defender-antivirus/troubleshoot-microsoft-defender-antivirus
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.defense_evasion
+  - attack.t1562.001
+logsource:
+  category: registry_set
+  product: windows
+detection:
+  selection_defender_disable:
+    TargetObject|contains:
+      - '\SOFTWARE\Policies\Microsoft\Windows Defender'
+      - '\SOFTWARE\Microsoft\Windows Defender'
+  selection_disable_flags:
+    Details|contains:
+      - 'DisableAntiSpyware'
+      - 'DisableRealtimeMonitoring'
+      - 'DisableBehaviorMonitoring'
+      - 'DisableBlockAtFirstSeen'
+      - 'DisableIOAVProtection'
+      - 'DisablePrivacyMode'
+      - 'DisableRoutinelyTakingAction'
+      - 'DisableScanningNetworkFiles'
+      - 'DisableScriptScanning'
+      - 'ServiceKeepAlive'
+  selection_value:
+    Details|contains:
+      - '0x00000001'
+      - '1'
+  condition: all of selection_*
+falsepositives:
+  - Legitimate system administration (rare)
+  - Security software installation conflicts
+fields:
+  - TargetObject
+  - Details
+  - User
+  - Computer
+  - ProcessId
+  - Image
+allowlist:
+  - Image: 'C:\Windows\System32\msiexec.exe'
+    Reason: 'Software installation - may temporarily modify Defender settings'
+related:
+  - id: i9j0k1l2-m3n4-8901-bcde-901234567234
+    type: correlated

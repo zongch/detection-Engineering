@@ -1,0 +1,60 @@
+title: LSASS Memory Dumping Attempt
+id: b3c4d5e6-f7g8-9012-cdef-1234567890ab
+status: stable
+level: critical
+description: |
+  Detects attempts to dump LSASS process memory to extract credentials.
+  LSASS (Local Security Authority Subsystem Service) holds sensitive
+  authentication data including plaintext passwords, Kerberos tickets, and NTLM hashes.
+references:
+  - https://attack.mitre.org/techniques/T1003/001/
+  - https://attack.mitre.org/techniques/T1003/003/
+  - https://www.microsoft.com/security/blog/2014/06/05/protecting-credentials-the-credential-guard/
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.credential_access
+  - attack.t1003.001
+  - attack.t1003.003
+logsource:
+  category: process_access
+  product: windows
+detection:
+  selection_lsass:
+    TargetImage|endswith:
+      - '\lsass.exe'
+  selection_high_privilege:
+    GrantedAccess:
+      - '0x1010'    # PROCESS_VM_READ | PROCESS_QUERY_INFORMATION
+      - '0x1038'    # PROCESS_VM_READ | PROCESS_QUERY_INFORMATION | PROCESS_VM_WRITE
+      - '0x1fffff'  # PROCESS_ALL_ACCESS
+      - '0x1410'    # PROCESS_VM_READ | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION
+  condition: all of selection_*
+falsepositives:
+  - Antivirus/EDR agents (Microsoft Defender, CrowdStrike, etc.)
+  - Windows Credential Manager (CredProv)
+  - System security components (wininit.exe, csrss.exe, lsm.exe)
+  - Legitimate backup or monitoring tools (rare)
+fields:
+  - SourceImage
+  - TargetImage
+  - GrantedAccess
+  - User
+  - Computer
+  - ProcessId
+  - AccessMask
+allowlist:
+  - SourceImage: 'C:\Windows\System32\wininit.exe'
+    Reason: 'System process - legitimate LSASS access'
+  - SourceImage: 'C:\Windows\System32\csrss.exe'
+    Reason: 'Client/Server Runtime Subsystem - system process'
+  - SourceImage: 'C:\Windows\System32\lsm.exe'
+    Reason: 'Local Session Manager - system process'
+  - SourceImage: 'C:\ProgramData\Microsoft\Windows Defender\Platform\*\MsMpEng.exe'
+    Reason: 'Microsoft Defender - legitimate security agent'
+  - SourceImage: 'C:\Program Files\WindowsApps\*\WindowsDefender\*\MsMpEng.exe'
+    Reason: 'Microsoft Defender - legitimate security agent'
+related:
+  - id: c4d5e6f7-g8h9-0123-defa-234567890bcd
+    type: correlated

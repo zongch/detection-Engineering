@@ -1,0 +1,45 @@
+title: SMB/Windows Admin Shares Lateral Movement
+id: d0e1f2g3-h4i5-9012-defa-012345678345
+status: stable
+level: high
+description: |
+  Detects use of Windows admin shares (ADMIN$, C$, IPC$) for lateral movement.
+  Attackers use these shares to execute code on remote systems.
+references:
+  - https://attack.mitre.org/techniques/T1021/002/
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.lateral_movement
+  - attack.t1021.002
+logsource:
+  category: network_connection
+  product: windows
+detection:
+  selection_smb:
+    DestinationPort: '445'
+  selection_admin_shares:
+    DestinationHostname|contains:
+      - 'ADMIN$'
+      - 'C$'
+      - 'IPC$'
+  condition: all of selection_*
+falsepositives:
+  - System administration (scheduled tasks, software deployment)
+  - File server operations
+fields:
+  - Image
+  - DestinationIp
+  - DestinationPort
+  - DestinationHostname
+  - User
+  - Computer
+allowlist:
+  - Image: 'C:\Windows\System32\svchost.exe'
+    Reason: 'System file sharing - verify context'
+  - User: 'DOMAIN\Administrator'
+    Reason: 'Admin operations - should be documented'
+related:
+  - id: e1f2g3h4-i5j6-0123-efab-123456789456
+    type: correlated

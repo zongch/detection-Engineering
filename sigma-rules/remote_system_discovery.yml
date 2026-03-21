@@ -1,0 +1,41 @@
+title: Remote System Discovery via Network Commands
+id: z6a7b8c9-d0e1-5678-bcde-678901234901
+status: stable
+level: medium
+description: |
+  Detects remote system discovery commands (ping, nslookup, net). Attackers
+  use these to map the network and identify targets for lateral movement.
+references:
+  - https://attack.mitre.org/techniques/T1018/
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.discovery
+  - attack.t1018
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection_discovery:
+    Image|endswith:
+      - '\ping.exe'
+      - '\nslookup.exe'
+      - '\tracert.exe'
+  condition: selection_discovery
+falsepositives:
+  - Network troubleshooting
+  - System administration
+fields:
+  - Image
+  - CommandLine
+  - User
+  - Computer
+  - ProcessId
+allowlist:
+  # Context-aware allowlist - high volume expected
+  - User: 'DOMAIN\ITAdmin'
+    Reason: 'Network troubleshooting - review command frequency'
+related:
+  - id: a7b8c9d0-e1f2-6789-efab-789012345012
+    type: similar

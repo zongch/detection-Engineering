@@ -1,0 +1,236 @@
+name: Detection Engineering CI/CD Pipeline
+
+on:
+  pull_request:
+    paths:
+      - 'sigma-rules/**/*.yml'
+      - '.github/workflows/*.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'sigma-rules/**/*.yml'
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+    inputs:
+      validate-only:
+        description: 'Run validation only (skip compilation)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  validate-rules:
+    name: Validate Sigma Rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Sigma CLI and Backends
+        run: |
+          pip install --upgrade pip
+          pip install sigma-cli
+          pip install pySigma-backend-splunk
+          pip install pySigma-backend-microsoft365defender
+          pip install pySigma-backend-elasticsearch
+
+      - name: Validate Sigma Syntax
+        run: |
+          echo "Validating Sigma rule syntax..."
+          find sigma-rules/ -name "*.yml" -exec sigma check {} \;
+          echo "✓ All Sigma rules passed syntax validation"
+
+      - name: Check Required Fields
+        run: |
+          echo "Checking required fields in Sigma rules..."
+          python .github/scripts/check-required-fields.py
+          echo "✓ All rules have required metadata"
+
+      - name: Validate ATT&CK Mappings
+        run: |
+          echo "Validating MITRE ATT&CK mappings..."
+          python .github/scripts/check-attack-mappings.py
+          echo "✓ All rules have ATT&CK technique mappings"
+
+      - name: Check for Duplicate IDs
+        run: |
+          echo "Checking for duplicate rule IDs..."
+          python .github/scripts/check-duplicates.py
+          echo "✓ No duplicate rule IDs found"
+
+      - name: Validate YAML Formatting
+        run: |
+          echo "Validating YAML formatting..."
+          python .github/scripts/check-yaml-formatting.py
+          echo "✓ All YAML files are properly formatted"
+
+  compile-rules:
+    name: Compile to SIEM Formats
+    needs: validate-rules
+    if: github.event.inputs.validate-only != 'true'
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        backend:
+          - name: splunk
+            format: conf
+            output: compiled/splunk/rules-all.conf
+          - name: microsoft365defender
+            format: kql
+            output: compiled/sentinel/rules-all.kql
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Sigma CLI and Backends
+        run: |
+          pip install --upgrade pip
+          pip install sigma-cli
+          pip install pySigma-backend-splunk
+          pip install pySigma-backend-microsoft365defender
+
+      - name: Compile to ${{ matrix.backend.name }}
+        run: |
+          echo "Compiling Sigma rules to ${{ matrix.backend.name }} format..."
+          sigma convert -t ${{ matrix.backend.name }} sigma-rules/**/*.yml > ${{ matrix.backend.output }}
+          echo "✓ Compiled $(wc -l < ${{ matrix.backend.output }}) lines to ${{ matrix.backend.name }}"
+
+      - name: Upload Compiled Rules - ${{ matrix.backend.name }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-${{ matrix.backend.name }}
+          path: ${{ matrix.backend.output }}
+          retention-days: 30
+
+      - name: Show Summary
+        run: |
+          echo "=== Compilation Summary ==="
+          echo "Backend: ${{ matrix.backend.name }}"
+          echo "Output: ${{ matrix.backend.output }}"
+          echo "Rules compiled: $(find sigma-rules/ -name "*.yml" | wc -l)"
+
+  generate-report:
+    name: Generate Coverage Report
+    needs: validate-rules
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate Coverage Report
+        run: |
+          python .github/scripts/generate-coverage-report.py > docs/COVERAGE-REPORT.md
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: docs/COVERAGE-REPORT.md
+
+      - name: Comment PR with Report
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('docs/COVERAGE-REPORT.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 📊 Coverage Report\n\n${report}`
+            });
+
+  deploy-artifacts:
+    name: Prepare Deployment Artifacts
+    needs: [compile-rules, generate-report]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create Deployment Package
+        run: |
+          mkdir -p deployment-package
+          cp artifacts/compiled-splunk/rules-all.conf deployment-package/splunk-rules.conf
+          cp artifacts/compiled-microsoft365defender/rules-all.kql deployment-package/sentinel-rules.kql
+          cp artifacts/coverage-report/COVERAGE-REPORT.md deployment-package/
+          cp README.md deployment-package/
+          cp docs/DEPLOYMENT-GUIDE.md deployment-package/ 2>/dev/null || true
+          cd deployment-package
+          tar -czf ../detection-rules-${{ github.sha }}.tar.gz *
+          cd ..
+
+      - name: Upload Deployment Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-package
+          path: detection-rules-${{ github.sha }}.tar.gz
+          retention-days: 90
+
+      - name: Create Release Summary
+        run: |
+          echo "## 🚀 Deployment Package Ready" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Rules**: $(find sigma-rules/ -name "*.yml" | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Splunk Rules: \`compiled-splunk\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Sentinel Rules: \`compiled-microsoft365defender\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Deployment Package: \`deployment-package\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download artifacts from the **Actions** tab to deploy to your SIEM."
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy FS Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy Results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'

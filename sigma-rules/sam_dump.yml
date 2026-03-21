@@ -1,0 +1,51 @@
+title: SAM Database Dumping via Reg.exe
+id: r8s9t0u1-v2w3-7890-bcde-890123456123
+status: stable
+level: critical
+description: |
+  Detects attempts to dump Windows SAM (Security Account Manager) database.
+  SAM contains local account password hashes. Attackers extract this for
+  credential theft and offline password cracking.
+references:
+  - https://attack.mitre.org/techniques/T1003/002/
+  - https://docs.microsoft.com/en-us/windows/win32/secmgmt/system-registry-hives
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.credential_access
+  - attack.t1003.002
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection_reg:
+    Image|endswith: '\reg.exe'
+  selection_save:
+    CommandLine|contains: 'save'
+  selection_sam_path:
+    CommandLine|contains:
+      - 'hklm\sam'
+      - 'hklm\\sam'
+      - 'HKLM\SAM'
+      - 'HKLM\\SAM'
+  condition: all of selection_*
+falsepositives:
+  - System backup operations (documented and scheduled)
+  - Migration tools (should be time-limited)
+fields:
+  - Image
+  - CommandLine
+  - User
+  - Computer
+  - ProcessId
+  - ParentImage
+allowlist:
+  - ParentImage: 'C:\Windows\System32\wbem\wmiprvse.exe'
+    Reason: 'System backup - verify scheduled task'
+  - ParentImage: 'C:\Windows\System32\cmd.exe'
+    User: 'SYSTEM'
+    Reason: 'Scheduled system backup'
+related:
+  - id: s9t0u1v2-w3x4-8901-cdef-901234567234
+    type: correlated

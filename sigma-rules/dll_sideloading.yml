@@ -1,0 +1,61 @@
+title: DLL Side-Loading via Known Vulnerable Applications
+id: p6q7r8s9-t0u1-5678-efab-678901234901
+status: stable
+level: high
+description: |
+  Detects DLL side-loading attempts. Attackers place malicious DLLs in
+  locations where legitimate applications will load them, allowing code
+  execution without modifying the application executable.
+references:
+  - https://attack.mitre.org/techniques/T1574/002/
+  - https://attack.mitre.org/techniques/T1574/
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.defense_evasion
+  - attack.privilege_escalation
+  - attack.t1574.002
+logsource:
+  category: image_load
+  product: windows
+detection:
+  selection_suspicious_dll:
+    ImageLoaded|endswith:
+      - '.dll'
+      - '.exe'
+  selection_suspicious_location:
+    ImageLoaded|contains:
+      - '\Temp\'
+      - '\AppData\Local\Temp\'
+      - '\Downloads\'
+      - '\Desktop\'
+  selection_legitimate_app:
+    Image|endswith:
+      - '\svchost.exe'
+      - '\explorer.exe'
+      - '\notepad.exe'
+      - '\winword.exe'
+      - '\excel.exe'
+      - '\powerpnt.exe'
+      - '\outlook.exe'
+  condition: all of selection_*
+falsepositives:
+  - Software installations (temporary)
+  - Portable application execution
+fields:
+  - Image
+  - ImageLoaded
+  - User
+  - Computer
+  - ProcessId
+  - OriginalFileName
+allowlist:
+  - Image: 'C:\Windows\System32\svchost.exe'
+    ImageLoaded: 'C:\Windows\System32\*.dll'
+    Reason: 'Standard system DLL loading'
+  - ImageLoaded: 'C:\Windows\Temp\*.dll'
+    Reason: 'Windows Update temp files - verify parent process'
+related:
+  - id: q7r8s9t0-u1v2-6789-fabc-789012345012
+    type: derived

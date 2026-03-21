@@ -1,0 +1,64 @@
+title: Suspicious PowerShell Encoded Command Execution
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: stable
+level: high
+description: |
+  Detects PowerShell execution with encoded commands, a technique commonly used
+  by attackers to obfuscate malicious payloads and bypass simple command-line
+  log detection.
+references:
+  - https://attack.mitre.org/techniques/T1059/001/
+  - https://attack.mitre.org/techniques/T1027/010/
+  - https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.execution
+  - attack.t1059.001
+  - attack.defense_evasion
+  - attack.t1027.010
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection_suspicious_parent:
+    ParentImage|endswith:
+      - '\cmd.exe'
+      - '\wscript.exe'
+      - '\cscript.exe'
+      - '\mshta.exe'
+      - '\wmiprvse.exe'
+      - '\rundll32.exe'
+  selection_powershell:
+    Image|endswith:
+      - '\powershell.exe'
+      - '\pwsh.exe'
+    CommandLine|contains:
+      - '-enc '
+      - '-EncodedCommand'
+      - '-ec '
+      - 'FromBase64String'
+  condition: all of selection_*
+falsepositives:
+  - Some legitimate IT automation tools use encoded commands for deployment
+  - SCCM and Intune may use encoded PowerShell for software distribution
+  - Document known legitimate sources in the allowlist below
+fields:
+  - ParentImage
+  - Image
+  - CommandLine
+  - User
+  - Computer
+  - ProcessId
+  - ParentProcessId
+allowlist:
+  - ParentImage: 'C:\Windows\System32\CCM\CcmExec.exe'
+    Reason: 'SCCM client - legitimate software distribution'
+  - CommandLine: '*SCCM*'
+    Reason: 'SCCM automation'
+  - CommandLine: '*ConfigMgr*'
+    Reason: 'Configuration Manager automation'
+related:
+  - id: b2c3d4e5-f6g7-8901-bcde-f12345678901
+    type: derived

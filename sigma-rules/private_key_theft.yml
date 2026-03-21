@@ -1,0 +1,55 @@
+title: Private Key File Access and Copy
+id: v2w3x4y5-z6a7-1234-fabc-234567890567
+status: stable
+level: high
+description: |
+  Detects access and copying of private key files (.pem, .key, .p12, .pfx).
+  Attackers steal private keys for SSH, HTTPS, and cryptographic operations
+  to bypass authentication and decrypt communications.
+references:
+  - https://attack.mitre.org/techniques/T1552/004/
+  - https://docs.microsoft.com/en-us/windows/win32/seccrypto/cryptography-tools
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.credential_access
+  - attack.t1552.004
+logsource:
+  category: file_access
+  product: windows
+detection:
+  selection_key_files:
+    TargetFilename|endswith:
+      - '.pem'
+      - '.key'
+      - '.p12'
+      - '.pfx'
+      - '.jks'
+      - '.keystore'
+  selection_suspicious_access:
+    Image|endswith:
+      - '\cmd.exe'
+      - '\powershell.exe'
+      - '\wscript.exe'
+      - '\cscript.exe'
+  condition: all of selection_*
+falsepositives:
+  - SSL certificate management (documented operations)
+  - Software installation/migration
+  - Backup operations (scheduled and known)
+fields:
+  - TargetFilename
+  - Image
+  - User
+  - Computer
+  - ProcessId
+allowlist:
+  - Image: 'C:\Windows\System32\certutil.exe'
+    TargetFilename: 'C:\ProgramData\*\*.pfx'
+    Reason: 'Certificate management - verify context'
+  - ParentImage: 'C:\Windows\System32\msiexec.exe'
+    Reason: 'Software installation with certificates'
+related:
+  - id: w3x4y5z6-a7b8-2345-cdef-345678901678
+    type: derived

@@ -1,0 +1,86 @@
+title: Suspicious Script Network Connection
+id: g7h8i9j0-k1l2-5678-defa-789012345012
+status: stable
+level: high
+description: |
+  Detects outbound network connections from script interpreters (PowerShell,
+  WScript, etc.), a strong indicator of command and control (C2) communication.
+  Legitimate software rarely uses scripts to initiate network connections.
+references:
+  - https://attack.mitre.org/techniques/T1071/
+  - https://attack.mitre.org/techniques/T1059/001/
+  - https://attack.mitre.org/techniques/T1059/005/
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.command_and_control
+  - attack.t1071
+  - attack.execution
+  - attack.t1059.001
+  - attack.t1059.005
+logsource:
+  category: network_connection
+  product: windows
+detection:
+  selection_script_interpreter:
+    Image|endswith:
+      - '\powershell.exe'
+      - '\pwsh.exe'
+      - '\wscript.exe'
+      - '\cscript.exe'
+      - '\mshta.exe'
+      - '\rundll32.exe'
+      - '\regsvr32.exe'
+  selection_outbound:
+    DestinationIp|not:
+      - '127.0.0.1'
+      - '0.0.0.0'
+      - '::1'
+  selection_not_localhost:
+    DestinationIp|not:
+      - '192.168.*'
+      - '10.*'
+      - '172.16.*'
+      - '172.17.*'
+      - '172.18.*'
+      - '172.19.*'
+      - '172.20.*'
+      - '172.21.*'
+      - '172.22.*'
+      - '172.23.*'
+      - '172.24.*'
+      - '172.25.*'
+      - '172.26.*'
+      - '172.27.*'
+      - '172.28.*'
+      - '172.29.*'
+      - '172.30.*'
+      - '172.31.*'
+  condition: selection_script_interpreter and selection_outbound and selection_not_localhost
+falsepositives:
+  - Rare: Script-based software updates (should be documented)
+  - Some IT automation tools (document in allowlist)
+  - Windows Update components (typically excluded by Image filter)
+fields:
+  - Image
+  - DestinationIp
+  - DestinationPort
+  - DestinationHostname
+  - User
+  - Computer
+  - Protocol
+  - ProcessId
+allowlist:
+  - DestinationHostname: '*.microsoft.com'
+    Reason: 'Microsoft update servers - legitimate'
+  - DestinationHostname: '*.windowsupdate.com'
+    Reason: 'Windows update servers - legitimate'
+  - DestinationHostname: '*.windows.net'
+    Reason: 'Microsoft cloud services - legitimate'
+  - Image: 'C:\Windows\System32\wscript.exe'
+    DestinationHostname: '*.internal.company.com'
+    Reason: 'Internal automation scripts - document specific domains'
+related:
+  - id: h8i9j0k1-l2m3-6789-efab-890123456123
+    type: correlated

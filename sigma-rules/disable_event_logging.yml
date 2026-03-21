@@ -1,0 +1,49 @@
+title: Windows Event Logging Disabled
+id: j0k1l2m3-n4o5-9012-cdef-012345678345
+status: stable
+level: critical
+description: |
+  Detects attempts to disable Windows event logging. Attackers disable logging
+  to destroy forensic evidence and avoid detection. Critical for incident
+  response and investigation.
+references:
+  - https://attack.mitre.org/techniques/T1562/004/
+  - https://docs.microsoft.com/en-us/windows/win32/eventlog/event-logging
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.defense_evasion
+  - attack.t1562.004
+logsource:
+  category: registry_set
+  product: windows
+detection:
+  selection_eventlog_key:
+    TargetObject|contains:
+      - '\SYSTEM\CurrentControlSet\Services\EventLog'
+  selection_disable:
+    Details|contains:
+      - 'Start'
+      - 'File'
+  selection_disable_value:
+    Details|contains:
+      - '4'  # Disabled
+      - '0'  # Empty path (disable log file)
+  condition: all of selection_*
+falsepositives:
+  - Extremely rare - legitimate systems never disable logging
+  - System misconfiguration (should be fixed, not allowed)
+fields:
+  - TargetObject
+  - Details
+  - User
+  - Computer
+  - ProcessId
+  - Image
+allowlist:
+  # No legitimate allowlist for this critical event
+  # All instances should be investigated
+related:
+  - id: k1l2m3n4-o5p6-0123-defa-123456789456
+    type: correlated

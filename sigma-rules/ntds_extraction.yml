@@ -1,0 +1,60 @@
+title: NTDS.dit Active Directory Database Extraction
+id: t0u1v2w3-x4y5-9012-defa-012345678345
+status: stable
+level: critical
+description: |
+  Detects attempts to extract NTDS.dit database from Domain Controllers.
+  NTDS.dit contains all domain user account hashes. Critical for credential
+  theft attacks in Active Directory environments.
+references:
+  - https://attack.mitre.org/techniques/T1003/003/
+  - https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/manage/ad-forest-recover-ad-database
+author: Detection Engineering Team
+date: 2026/03/21
+modified: 2026/03/21
+tags:
+  - attack.credential_access
+  - attack.t1003.003
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection_ntds_copy:
+    Image|endswith:
+      - '\cmd.exe'
+      - '\powershell.exe'
+    CommandLine|contains:
+      - '\Windows\NTDS\ntds.dit'
+      - 'ntds.dit'
+  selection_ntdsutil:
+    Image|endswith: '\ntdsutil.exe'
+    CommandLine|contains:
+      - 'ifm'
+      - 'create'
+  selection_vssadmin:
+    Image|endswith: '\vssadmin.exe'
+    CommandLine|contains:
+      - 'create'
+      - 'shadowcopy'
+  condition: 1 of selection_*
+falsepositives:
+  - Legitimate AD backup operations (scheduled and documented)
+  - AD migration or upgrade procedures
+fields:
+  - Image
+  - CommandLine
+  - User
+  - Computer
+  - ProcessId
+  - ParentImage
+allowlist:
+  - ParentImage: 'C:\Windows\System32\wbem\wmiprvse.exe'
+    User: 'DOMAIN\BackupAccount'
+    Reason: 'Scheduled AD backup - verify backup schedule'
+  - Image: 'C:\Windows\System32\vssadmin.exe'
+    CommandLine: '*create shadowcopy*'
+    User: 'SYSTEM'
+    Reason: 'System VSS snapshot - investigate if unusual'
+related:
+  - id: u1v2w3x4-y5z6-0123-efab-123456789456
+    type: correlated

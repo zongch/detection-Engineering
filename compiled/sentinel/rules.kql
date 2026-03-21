@@ -1,0 +1,172 @@
+===============================================================================
+   DETECTION RULES - COMPILED FOR MICROSOFT SENTINEL KQL
+   Generated: 2026-03-21
+   Source: Sigma Rules
+===============================================================================
+
+-------------------------------------------------------------------------------
+Rule 1: Suspicious PowerShell Encoded Command Execution
+Sigma ID: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+ATT&CK: T1059.001, T1027.010
+Level: Critical
+-------------------------------------------------------------------------------
+
+// Suspicious PowerShell encoded command execution
+DeviceProcessEvents
+| where Timestamp > ago(1h)
+| where InitiatingProcessFileName in~ (
+    "cmd.exe", "wscript.exe", "cscript.exe", "mshta.exe", "wmiprvse.exe", "rundll32.exe"
+  )
+| where FileName in~ ("powershell.exe", "pwsh.exe")
+| where ProcessCommandLine has_any (
+    "-enc ", "-EncodedCommand", "-ec ", "FromBase64String"
+  )
+| where ProcessCommandLine !contains "SCCM"
+  and ProcessCommandLine !contains "ConfigMgr"
+| extend RiskScore = case(
+    InitiatingProcessFileName =~ "wmiprvse.exe", 90,
+    InitiatingProcessFileName =~ "mshta.exe", 85,
+    InitiatingProcessFileName =~ "rundll32.exe", 80,
+    70
+  )
+| project Timestamp, DeviceName, AccountName,
+    InitiatingProcessFileName, FileName, ProcessCommandLine,
+    RiskScore, ProcessId, InitiatingProcessId
+| sort by RiskScore desc, Timestamp desc
+
+-------------------------------------------------------------------------------
+Rule 2: LSASS Memory Dumping Attempt
+Sigma ID: b3c4d5e6-f7g8-9012-cdef-1234567890ab
+ATT&CK: T1003.001, T1003.003
+Level: Critical
+-------------------------------------------------------------------------------
+
+// LSASS memory dumping attempt
+DeviceProcessEvents
+| where Timestamp > ago(1h)
+| where TargetFileName has "lsass.exe"
+| where RequestedAccess in ("0x1010", "0x1038", "0x1fffff", "0x1410")
+| where not (
+    InitiatingProcessFileName == "wininit.exe"
+    or InitiatingProcessFileName == "csrss.exe"
+    or InitiatingProcessFileName == "lsm.exe"
+    or InitiatingProcessFileName has "MsMpEng.exe"
+  )
+| extend RiskScore = 90
+| project Timestamp, DeviceName, AccountName,
+    InitiatingProcessFileName, TargetFileName, RequestedAccess,
+    RiskScore, ProcessId, InitiatingProcessId
+| sort by RiskScore desc, Timestamp desc
+
+-------------------------------------------------------------------------------
+Rule 3: Process Hollowing / Injection Detection
+Sigma ID: d4e5f6g7-h8i9-1234-efab-345678901cde
+ATT&CK: T1055.012, T1055
+Level: High
+-------------------------------------------------------------------------------
+
+// Process hollowing / injection detection
+DeviceProcessEvents
+| where Timestamp > ago(1h)
+| where ActionType == "RemoteThreadCreated"
+| where not (
+    InitiatingProcessFolderPath startswith @"C:\Windows\System32\"
+  )
+| where not (
+    FileName == "csrss.exe"
+  )
+| extend RiskScore = 75
+| project Timestamp, DeviceName, AccountName,
+    InitiatingProcessFileName, FileName, RemoteThreadId,
+    RiskScore, InitiatingProcessId, ProcessId
+| sort by RiskScore desc, Timestamp desc
+
+-------------------------------------------------------------------------------
+Rule 4: Registry Persistence via Run Keys
+Sigma ID: f5g6h7i8-j9k0-3456-bcde-567890123ef0
+ATT&CK: T1547.001
+Level: Medium
+-------------------------------------------------------------------------------
+
+// Registry persistence via Run keys
+DeviceRegistryEvents
+| where Timestamp > ago(1h)
+| where ActionType in ("RegistryValueSet", "RegistryKeyCreated", "RegistryValueCreated")
+| where RegistryKey has @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+  or RegistryKey has @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+| where RegistryValueData has @".exe"
+  or RegistryValueData has @".bat"
+  or RegistryValueData has @".cmd"
+  or RegistryValueData has @".ps1"
+  or RegistryValueData has @".vbs"
+  or RegistryValueData has @".js"
+| where not (
+    RegistryValueData startswith @"C:\Program Files\"
+    or RegistryValueData startswith @"C:\Program Files (x86)\"
+    or RegistryValueData startswith @"C:\Windows\System32\"
+    or RegistryValueData startswith @"C:\Windows\SysWOW64\"
+  )
+| where not (
+    RegistryKey contains "OneDriveSetup.exe"
+    or RegistryKey contains "MicrosoftEdgeAutoLaunch"
+    or RegistryValueData has "OneDrive.exe"
+    or RegistryValueData has "Razer Synapse"
+  )
+| extend RiskScore = 60
+| project Timestamp, DeviceName, AccountName,
+    RegistryKey, RegistryValueData, RiskScore, InitiatingProcessId
+| sort by RiskScore desc, Timestamp desc
+
+-------------------------------------------------------------------------------
+Rule 5: Suspicious Script Network Connection
+Sigma ID: g7h8i9j0-k1l2-5678-defa-789012345012
+ATT&CK: T1071, T1059.001, T1059.005
+Level: High
+-------------------------------------------------------------------------------
+
+// Suspicious script network connection
+DeviceNetworkEvents
+| where Timestamp > ago(1h)
+| where InitiatingProcessFileName in~ (
+    "powershell.exe", "pwsh.exe", "wscript.exe", "cscript.exe",
+    "mshta.exe", "rundll32.exe", "regsvr32.exe"
+  )
+| where not (
+    RemoteIP == "127.0.0.1"
+    or RemoteIP == "0.0.0.0"
+    or RemoteIP == "::1"
+  )
+| where not (
+    RemoteIP startswith "192.168."
+    or RemoteIP startswith "10."
+    or RemoteIP startswith "172.16."
+    or RemoteIP startswith "172.17."
+    or RemoteIP startswith "172.18."
+    or RemoteIP startswith "172.19."
+    or RemoteIP startswith "172.20."
+    or RemoteIP startswith "172.21."
+    or RemoteIP startswith "172.22."
+    or RemoteIP startswith "172.23."
+    or RemoteIP startswith "172.24."
+    or RemoteIP startswith "172.25."
+    or RemoteIP startswith "172.26."
+    or RemoteIP startswith "172.27."
+    or RemoteIP startswith "172.28."
+    or RemoteIP startswith "172.29."
+    or RemoteIP startswith "172.30."
+    or RemoteIP startswith "172.31."
+  )
+| where not (
+    RemoteUrl has ".microsoft.com"
+    or RemoteUrl has ".windowsupdate.com"
+    or RemoteUrl has ".windows.net"
+  )
+| extend RiskScore = 75
+| project Timestamp, DeviceName, AccountName,
+    InitiatingProcessFileName, RemoteIP, RemotePort, RemoteUrl,
+    RiskScore, InitiatingProcessId
+| sort by RiskScore desc, Timestamp desc
+
+===============================================================================
+END OF SENTINEL KQL RULES
+===============================================================================
